@@ -434,9 +434,9 @@ class BiphasicExperiment:
 
 class StressRelaxation():
 
-    def __init__(self, BiphasicAnalysis, cycleNum, dfData):
+    def __init__(self, experiment: BiphasicExperiment, cycleNum, dfData):
 
-        self.experiment = BiphasicAnalysis
+        self.experiment = experiment
 
         settings = self.settings = self.experiment.settings
         self.samplingRate = self.experiment.samplingRate
@@ -771,6 +771,7 @@ class StressRelaxation():
             ##region Downsampling
             f = dfGraph.freq.values
             eTF = dfGraph.eTF.values
+            print(dfGraph)
             if ulttb:
                 d_freq = downsample(np.asarray(list(zip(f, eTF))), 25)
                 f, eTF = list(zip(*d_freq))
@@ -1016,7 +1017,7 @@ class StressRelaxation():
             Cexp = C(Hc, Ht, lam2)
             th = self.derivedProps['th'][0]
             p = [Aexp, Bexp, Cexp, th]
-            rootList = roots(1000)
+            rootList = roots(1000, Aexp)
             scale = calcScale(p, rootList)
             rootList = rootList[:100]
 
@@ -1109,7 +1110,7 @@ class StressRelaxation():
 
 class BiphasicTF():
 
-    def __init__(self, StressRelaxation):
+    def __init__(self, cycle: StressRelaxation):
         self.matProps = []
         self.mTF = []
         self.eTF = []
@@ -1120,16 +1121,16 @@ class BiphasicTF():
         self.R2 = 0
         self.FreqR2 = 0
         self.Hc = 0
-        self.mode = StressRelaxation.settings['testMode']
-        self.Ey = StressRelaxation.Ey
-        self._fitting_bounds = StressRelaxation.settings['fittingBounds']
-        self.rad = StressRelaxation.settings['rad'] * 1e-3
-        self.verbose = StressRelaxation.settings['verbose']
-        self.freq = StressRelaxation.vFreq
-        self.time = StressRelaxation.dfLogReduced.Time.values
-        self.nstress = StressRelaxation.dfLogReduced.NStressFilt.values
-        self.nstrain = StressRelaxation.dfLogReduced.NStrainFilt.values
-        timeExtend = StressRelaxation.extendTime
+        self.mode = cycle.settings['testMode']
+        self.Ey = cycle.Ey
+        self._fitting_bounds = cycle.settings['fittingBounds']
+        self.rad = cycle.settings['rad'] * 1e-3
+        self.verbose = cycle.settings['verbose']
+        self.freq = cycle.vFreq
+        self.time = cycle.dfLogReduced.Time.values
+        self.nstress = cycle.dfLogReduced.NStressFilt.values
+        self.nstrain = cycle.dfLogReduced.NStrainFilt.values
+        timeExtend = cc.extendTime
         self.timeEnd = self.time[-1] - timeExtend
         self.rampTime = self.time[np.argmax(self.nstress)]
 
@@ -1156,6 +1157,9 @@ class BiphasicTF():
         phi = list(map(lambda x: lapStress(x), s))
         eps = np.asarray(eps)
         phi = np.asarray(phi)
+        print(eps)
+        print(phi)
+
         if mode == 'c':
             gExp = np.divide(eps, phi)
         else:
@@ -1176,7 +1180,7 @@ class BiphasicTF():
             Gexp, Gmodel))**2 / (np.dot(Gexp, Gexp) * np.dot(Gmodel, Gmodel))
         return np.log(1 - c3)
 
-    def _obj_func3(self, x0, freq, Gexp, Ey, f, w=[1, 1, 1, 1, 1, 1]):
+    def _obj_func3(self, x0, freq, Gexp, Ey, f, w=[1, 1, 1, 1, 1, 1]) -> int:
         params = [x / y for x, y in zip(x0, w)]
         Ht, lam2 = params[0], params[1]
         Hc = Ey + 2 * lam2**2 / (Ht + lam2)
@@ -1255,7 +1259,7 @@ class BiphasicTF():
         print('Starting...')
 
         weights = [1, 1, 1]
-        self.fittingObj = obj = obj_func_3param
+        self.fittingObj = obj = self._obj_func3
         matModel = self._ucc_cle3
         fitMask = (self.freq > self._fitting_bounds[0]) & (
             self.freq < self._fitting_bounds[1])

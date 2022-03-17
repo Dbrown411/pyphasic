@@ -20,8 +20,7 @@ def norm_ramp_hold(t: NDArray):
     return t
 
 
-def interpolation_signal(time, signal) -> Callable:
-    t = time
+def interpolation_signal(t, signal) -> Callable:
     sig0 = signal[1:]
     sig1 = signal[0:-1]
     t0 = t[1:]
@@ -33,7 +32,8 @@ def interpolation_signal(time, signal) -> Callable:
             e1 = -1 * s * t1
             b = np.exp(e1) - np.exp(e0)
             y = sum(((sig0 - sig1) / (s**2 * (t0 - t1))) * b)
-        except:
+        except Exception as e:
+            print(e)
             b = compExp(e1) - compExp(e0)
             y = sum(((sig0 - sig1) / (s**2 * (t0 - t1))) * b)
         return y

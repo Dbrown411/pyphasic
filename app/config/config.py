@@ -9,8 +9,8 @@ class ConfigContainer:
     nParam = 100  # number of parameters to try for ChiSquare fitting
     extendTime = 2000  # number of datapoints to extend the equilibrium values
 
-    invLap = True  ##Method used to get time domain prediction of stress
-    log_messages = True
+    invLap = False  ##Method used to get time domain prediction of stress
+    log_messages = False
     export_ramp_data = False
     label_font_size = 14
     preload_pattern = r.compile(r'[A-Za-z]*')
