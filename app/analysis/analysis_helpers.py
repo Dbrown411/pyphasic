@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from .vectorize_mp import compExp
 
 
-def _calcR2(model: NDArray, exp: NDArray):
+def calculate_r2(model: NDArray, exp: NDArray):
     mean_exp = np.mean(exp)
     num = np.sum((exp - model)**2)
     den = np.sum((exp - mean_exp)**2)

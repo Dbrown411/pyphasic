@@ -5,7 +5,7 @@ import time
 import pandas as pd
 import scipy.special as special
 import scipy.optimize as optimize
-from mpmath import arg, fabs, invertlaplace
+from mpmath import invertlaplace
 import scipy.signal as signal
 import seaborn as sns
 import matplotlib
@@ -1067,8 +1067,8 @@ class StressRelaxation():
                 dfReduced['modelStressFit'] = downsampModelStress
 
                 print(f'Done... {time.time()-lapStartTime} seconds')
-                self.tdR2 = _calcR2(dfReduced.modelStressFit.values,
-                                    dfReduced.Stress.values)
+                self.tdR2 = calculate_r2(dfReduced.modelStressFit.values,
+                                         dfReduced.Stress.values)
                 print(f'Model R2: {self.tdR2}')
             self.dfReduced = dfReduced
 
@@ -1087,50 +1087,17 @@ class StressRelaxation():
 
         if self.settings['gSimpleModelFit']:
 
-            def modelRamp(df, rootList, p):
-                Al, Bl, Cl, th = p[0], p[1], p[2], p[3]
-                samplingPeriod = 1e-3
-                time1 = (df.Time[df.Time <= self.rampTime] -
-                         samplingPeriod) / th
-                t = (df.Time - samplingPeriod) / th
-                summed1 = []
-                summed2 = []
-                num1 = 20
-                root1 = rootList[1:num1]
-                r2 = np.float64(root1**2)
-                t0 = (self.rampTime - samplingPeriod) / th
-                for x in t:
-                    if x <= t0:
-                        r1 = np.exp(np.float64(-1 * x * r2))
-                        r1 = np.nan_to_num(r1)
-                        b = 1 / (r2 * ((r2 / (2 * Al)) + (Al / (2.0)) - 1))
-                        temp = r1 * b
-                        y = np.sum(temp)
-                        summed1.append(y)
-                    else:
-                        r1 = (np.exp(np.float64(-1 * x * r2)) -
-                              np.exp(np.float64(t0 * r2)) *
-                              np.exp(np.float64(-1 * x * r2)))
-                        r1 = np.nan_to_num(r1)
-                        b = 1 / (r2 * ((r2 / (2 * Al)) + (Al / (2.0)) - (1)))
-                        y = np.sum(r1 * b)
-                        summed2.append(y)
-                summed1 = np.array(summed1)
-                summed2 = np.array(summed2)
-                phi1 = ((1 - Bl) /
-                        (4 * (Al - 2) * t0)) + (time1.values / t0) + (
-                            (Bl - 1) * (1 - (2 / Al)) / t0) * summed1
-                phi2 = 1 + ((Bl - 1) * (1 - (2 / Al)) / t0) * summed2
-                phi = np.append(phi1, phi2)
-                return phi
-
             dfUniform = dfUniform[dfUniform.Time <= self.timeEnd]
-            dfUniform['modelFit'] = modelRamp(dfUniform, rootList, p)
+            dfUniform['modelFit'] = ucc_ramp_hold_model(
+                dfUniform.Time.values, p, rootList, self.rampTime)
             self.dfUniform = dfUniform
             reduced = dfUniform[(dfUniform.index % 10 == 0) |
                                 (dfUniform.index == 0)]
+
+            tnorm = reduced.Time.values / self.rampTime
+
             axFit[0].plot(reduced.Time.values,
-                          reduced.Time.apply(ramp).values,
+                          norm_ramp_hold(tnorm) * self.equilStrain,
                           linestyle='-')
             axFit[1].plot(reduced.Time.values,
                           reduced.modelFit.values,
@@ -1199,16 +1166,6 @@ class BiphasicTF():
         gain, phase = experimental_to_bode(self.freq, self.time, self.nstrain,
                                            self.nstress, self.mode)
         return gain, phase
-
-    def _calcR2(self, model, exp):
-        mean_exp = np.mean(exp)
-        num = np.sum((exp - model)**2)
-        den = np.sum((exp - mean_exp)**2)
-        try:
-            r2 = 1 - num / den
-        except:
-            r2 = np.nan
-        return r2
 
     def _obj_func4(self, x0, freq, Gexp, f=None):
         if not f:
@@ -1343,9 +1300,8 @@ class BiphasicTF():
             self.mTF = self._ucc_cle3(self.freq, self.matProps, self.Ey)[0]
             self.mGain, self.mPhase = self._ucc_cle3(self.freq, self.matProps,
                                                      self.Ey, 1j)
-            self.R2 = self._calcR2(self.mTF[fitMask], self.Gexp)
-            #self.FreqR2 = self._calcR2(self.mTF[fitMask],self.Gexp)
-            # self.R2 = self.FreqR2
+            self.R2 = calculate_r2(self.mTF[fitMask], self.Gexp)
+
             self.dfFreq = pd.DataFrame({
                 'freq': self.freq,
                 'eTF': self.eTF,
@@ -1399,8 +1355,8 @@ class BiphasicTF():
                                                  self.Ey, 1j)
         p = self._calc_p(self.matProps)
         self.mStress = self._modelRamp(self.time, p, self._roots(20, p)[1:])
-        self.FreqR2 = self._calcR2(self.mTF[fitMask], self.Gexp)
-        self.R2 = self._calcR2(self.mStress, self.nstress)
+        self.FreqR2 = calculate_r2(self.mTF[fitMask], self.Gexp)
+        self.R2 = calculate_r2(self.mStress, self.nstress)
 
     def get_data(self):
         columns = ['t0']

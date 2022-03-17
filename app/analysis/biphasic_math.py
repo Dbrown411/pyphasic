@@ -38,14 +38,18 @@ def experimental_to_bode(freq, time, strain, stress, mode='c'):
     return gain, phase
 
 
-def ucc_ramp_hold_model(time, params, root, rampTime):
+def ucc_ramp_hold_model(time, params, roots: list, rampTime):
+    num1 = 20
+    if num1 > len(roots):
+        num1 = len(roots)
+
     Al, Bl, Cl, th = params
     rampMask = (time <= rampTime)
     time1 = time[rampMask] / th
     t = time / th
     summed1 = []
     summed2 = []
-    root1 = root
+    root1 = roots[1:num1]
     r2 = np.float64(root1**2)
     t0 = rampTime / th
     for x in t:
